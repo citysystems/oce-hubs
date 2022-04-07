@@ -11,7 +11,8 @@ RUN apt-get update && apt-get install -y \
     libsasl2-dev \
     libv8-dev \
     libgdal-dev \
-    protobuf-c-compiler \
+    libprotobuf-dev \
+    protobuf-compiler \
     cargo \
     && rm -rf /var/lib/apt/lists/*
 
