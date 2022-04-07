@@ -1,0 +1,2480 @@
+---
+title: "Stanford Community Engagement Hubs Map"
+runtime: shiny
+output:
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+---
+
+<style>
+.leaflet-container {
+background: #f4f4f4;
+}
+
+.leaflet-shadow-pane {
+visibility: hidden;
+}
+
+body {
+padding:0 0 0 0;
+background: #f4f4f4;
+}
+
+body hr {
+margin: 0 0;
+}
+
+.section.sidebar {
+top: 0px;
+bottom: 10px;
+left: 0px;
+padding-top: 5px;
+padding-left: 10px;
+padding-right: 20px;
+background-color: #f4f4f4;
+}
+
+.chart-wrapper {
+border: 0;
+border-radius: 0;
+margin-bottom: 0;
+margin-right: 0;
+}
+
+.chart-shim {
+position: absolute;
+left: 10; 
+top: 0; 
+right: 0; 
+bottom: 0;
+}
+
+.navbar{
+visibility: hidden
+}
+
+.marker-cluster-small {
+background-color: rgba(212,62,42,0.5);
+}
+
+.marker-cluster-small div {
+background-color: rgba(212,62,42,1);
+}
+
+.marker-cluster-medium {
+background-color: rgba(212,62,42,0.5);
+}
+
+.marker-cluster-medium div {
+background-color: rgba(212,62,42,1);
+}
+
+.marker-cluster-large {
+background-color: rgba(212,62,42,0.5);
+}
+
+.marker-cluster-large div {
+background-color: rgba(212,62,42,1);
+}
+
+.btn:active {
+background-color: #f0f0f0;
+box-shadow: 0 0px #f0f0f0;
+}
+
+</style>
+
+```{r global, include = FALSE}
+library(flexdashboard)
+library(readr)
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(mapboxapi)
+library(sf)
+library(leaflet)
+library(DT)
+# library(hover)
+# library(shinyjs)
+
+data <- read_csv("https://raw.githubusercontent.com/citysystems/citysystems.github.io/master/oce/hubs_from_airtable.csv") %>% 
+  st_as_sf(wkt = "geometry")
+
+unique_themes <- c("Arts & Humanities","Education","Environment and Sustainability","Equity or Socioeconomic Issues","Health","Identity & Human Rights","Law, Policy, & Justice","Recreation and Culture","Media and Technology","Global","Other")
+
+unique_schools <- c("Dean of Research","Graduate School of Business","Graduate School of Education","Provost","School of Earth, Energy & Environmental Sciences","School of Engineering","School of Humanities & Sciences","School of Law","Stanford Medicine","Stanford Athletics","Vice President for the Arts","Vice Provost for Graduate Education","Vice Provost for Undergraduate Education") 
+
+button_texts <- c("All Hubs",unique_schools,"")
+
+urls <- c(
+  "all_oce",
+  "stanford_president",
+  "stanford_business_s",
+  "stanford_education_s",
+  "stanford_flag_f",
+  "stanford_eee_s",
+  "stanford_engineering_s",
+  "stanford_humanities_s",
+  "stanford_law_s",
+  "stanford_medicine_s",
+  "stanfordlogo",
+  "stanford_vpa_s",
+  "stanford_vpge_s",
+  "stanford_vpue_s",
+  "placeholder_oce"
+)
+
+campus_hubs <- unique(data$`Campus Hubs`)
+
+icons <- awesomeIcons(
+  icon = "circle",
+  iconColor = "#820000",
+  markerColor = '#8C1515',
+  library = 'fa'
+)
+
+icon_selected <- awesomeIcons(
+  icon = "circle",
+  iconColor = "#820000",
+  markerColor = '#820000',
+  library = 'fa'
+)
+
+button_style <- "display: inline-block;vertical-align:top; width: 144px;margin-left:3px; margin-right: 3px;"
+
+text_home <- renderUI({
+  HTML(paste(
+    h1(strong("Community Engagement Hubs")),
+    sep = "<br>"
+  ))
+})
+
+button_list <- list()
+button_text_list <- list()
+
+for(i in 1:15){
+  
+  button_list[[i]] <- div(
+    actionButton(
+      inputId = paste0("button",i),
+      tags$img(src = paste0("https://raw.githubusercontent.com/citysystems/citysystems.github.io/master/icons/",urls[i],".png"),height = "50px"),
+      style="background: transparent; border: none; outline: none;"
+    ),
+    style=button_style,
+    align = "center"
+  )
+  
+  button_text_list[[i]] <- div(
+    HTML(paste0("<center><font size=3>",button_texts[i],"</font></center>")),
+    style=button_style
+  )
+  
+}
+
+menu_list <- list()
+i <- 1
+x <- 1
+while(i <= 15){
+  
+  menu_list[[x]] <- button_list[[i]]
+  menu_list[[x+3]] <- button_text_list[[i]]
+  
+  i <- i + 1
+  
+  if(x%%3==0){
+    x <- x + 4
+  } else {
+    x <- x + 1
+  }
+}
+
+menu <- renderUI(menu_list)
+
+values <- reactiveValues(
+  previous = "",
+  school = NULL,
+  name_list = "",
+  radio_indicator = "icon",
+  theme_select = NULL,
+  school_filter = "no",
+  theme_filter = "no"
+)
+```
+
+Sidebar {.sidebar data-width=500}
+-----------------------------------------------------------------------
+
+<img src="https://raw.githubusercontent.com/citysystems/citysystems.github.io/master/images/oce.png" alt="Office of Community Engagement" style = "width:70%; margin-left:-10px">
+
+```{r}
+uiOutput("theme_select_box")
+
+uiOutput("back_button")
+uiOutput("text")
+uiOutput("text_descriptive")
+uiOutput("radio_box",style="display:inline-block;vertical-align:left; width: 450px;margin-top:10px;")
+uiOutput("theme_box")
+uiOutput("school_box")
+uiOutput("table_df")
+
+uiOutput("menu", style = "display:inline-block;width: 470px;")
+# uiOutput("button14",style=button_style,align = "center")
+# uiOutput("button8",style=button_style,align = "center")
+# uiOutput("button1",style=button_style,align = "center")
+# uiOutput("text14",style=button_style)
+# uiOutput("text8",style=button_style)
+# uiOutput("text1",style=button_style)
+# uiOutput("button3",style=button_style,align = "center")
+# uiOutput("button9",style=button_style,align = "center")
+# uiOutput("button2",style=button_style,align = "center")
+# uiOutput("text3",style=button_style)
+# uiOutput("text9",style=button_style)
+# uiOutput("text2",style=button_style)
+# uiOutput("button4",style=button_style,align = "center")
+# uiOutput("button5",style=button_style,align = "center")
+# uiOutput("button6",style=button_style,align = "center")
+# uiOutput("text4",style=button_style)
+# uiOutput("text5",style=button_style)
+# uiOutput("text6",style=button_style)
+# uiOutput("button7",style=button_style,align = "center")
+# uiOutput("button13",style=button_style,align = "center")
+# uiOutput("button12",style=button_style,align = "center")
+# uiOutput("text7",style=button_style)
+# uiOutput("text13",style=button_style)
+# uiOutput("text12",style=button_style)
+# uiOutput("button11",style=button_style,align = "center")
+# uiOutput("button10",style=button_style,align = "center")
+# uiOutput("button15",style=button_style,align = "center")
+# uiOutput("text11",style=button_style)
+# uiOutput("text10",style=button_style)
+# uiOutput("text15",style=button_style)
+
+uiOutput("submit_button", style="display: inline-block;vertical-align:top; width: 450px;margin-top:30px;", align = "center")
+
+uiOutput("infotext")
+```
+
+```{r, context = "server"}
+output$theme_select_box <- renderUI({})
+
+output$text <- text_home
+
+output$text_descriptive <- renderUI({})
+
+# use_hover()
+  
+output$menu <- menu
+
+output$submit_button <- renderUI({
+  actionButton(
+    "submit",
+    label ="Add or Modify a Hub", 
+    onclick ="window.open('https://airtable.com/shr2a0fVHYMZc0OJI', '_blank')",
+    width = "50%",
+    style = "background: #3d464e;color: #f0f0f0;"
+    
+  )
+})
+
+output$infotext <- renderUI({
+  HTML(paste(
+    "",
+    "",
+    "Managed by: <a href = https://community.stanford.edu/ target='_blank'>Stanford Office of Community Engagement</a>",
+    "Contact us at: merryp@stanford.edu",
+    "",
+    "",
+    "This interactive map represents Stanford’s engagement with the communities the university touches. It is intended to be a dynamic resource that illustrates Stanford’s many Community Engagement Hubs. OCE defines “Community Engagement Hubs” as the offices and units at Stanford that are able to:",
+    "<ul><li>Point to one or more sustained partnerships with actionable work</li><li>Support dedicated staff to sustain the partnership and engage faculty and students</li><li>Practice <a href = https://haas.stanford.edu/about/our-approach/principles-ethical-and-effective-service/ target='_blank'>ethical and effective service</a>, are centered on co-learning, and respond to needs identified by those closest to those needs.</li><li>Are eager to elevate community engagement at Stanford, support colleagues and advance the institution.</li></ul>",
+    "How to Navigate: ",
+    "Click on the \"Impact Area\" dropdown menu to sort by engagement categories. Select the icons (in the icon view) or the school dropdown menu (in the list view) to sort based on Stanford schools and enter list view and enter list view. Click on the map markers or list items to display more information about a specific hub. To go back to the list view, click the \"Back to all\" button. To go back to the icon view, click anywhere on the map that's not a marker.",
+    sep = "<br>"
+  ))
+})
+```
+
+```{r}
+output$theme_box <- renderUI({
+  selectizeInput(
+    "theme_select_box",
+    label = "Filter by Impact Area: ",
+    choices = c(unique_themes),
+    selected = NULL,
+    multiple = TRUE,
+    options = list(placeholder = "All Categories")
+  )
+})
+
+output$school_box <- renderUI({})
+output$table <- ({})
+output$back_button <- ({})
+```
+
+Row
+-----------------------------------------------------------------------
+
+### 
+
+```{r}
+leafletOutput("map")
+```
+
+```{r, context="server"}
+output$map <- renderLeaflet({
+  
+  leaflet() %>% 
+    addMapboxTiles(
+      style_id = "streets-v11",
+      username = "mapbox",
+      access_token = "pk.eyJ1IjoiZGVyZWtvdXlhbmciLCJhIjoiY2s5Yno5bXByMDM1djNlcDhsMTFqM3VjcyJ9.bcf4iQucxDFqq-0a9bwmsQ",
+      options = leaflet::tileOptions(minZoom = 9)
+    ) %>% 
+    addMapPane("selectable_hubs", 410) %>% 
+    addMapPane("selection", 420) %>%
+    addAwesomeMarkers(
+      data = data,
+      icon = icons,
+      label = ~`Campus Hubs`,
+      layerId = ~`Campus Hubs`,
+      options = pathOptions(
+        pane = "selectable_hubs"
+      ),
+      clusterOptions = markerClusterOptions(
+        showCoverageOnHover = F,
+        freezeAtZoom = "maxKeepSpiderfy"
+      )
+    ) %>% 
+    setView(
+      lng = -122.17014,
+      lat = 37.42752,
+      zoom = 15
+    )
+  
+})
+``` 
+
+```{r}
+observeEvent(input$map_marker_click,{
+  
+  output$school_box <- renderUI({})
+  output$theme_box <- renderUI({})
+  output$infotext <- renderUI({})
+  
+  marker <- input$map_marker_click
+  
+  selected_data2 <-
+    data %>% 
+    filter(`Campus Hubs` == marker$id)
+  
+  output$text <- renderUI({
+    
+    HTML(paste(
+      paste0("<a href='",selected_data2$URL,"' target='_blank'>",h1(strong(selected_data2$`Campus Hubs`)),"</a>",collapse = "")
+    ))      
+  })
+  
+  output$text_descriptive <- renderUI({
+    
+    HTML(paste(
+      "</br>",
+      "</br>",
+      if(!is.na(selected_data2$`Logo`)){tags$img(src = selected_data2$`Logo`,width = "180px")},
+      if(!is.na(selected_data2$`Logo`)){paste0("</br>","</br>")},
+      if(!is.na(selected_data2$Address)){paste0("<strong>Address:</strong> ",selected_data2$Address,"</br>")},
+      if(!is.na(selected_data2$school_official)){paste0("<strong>Stanford Unit:</strong> ",selected_data2$school_official,"</br>")},
+      if(!is.na(selected_data2$`Director Name (new)`)){paste0("<strong>Faculty Director Name:</strong> ",selected_data2$`Director Name (new)`,"</br>")},
+      if(!is.na(selected_data2$`Other Point of Contact Name (new)`)){paste0("<strong>Points of Contact:</strong> ",selected_data2$`Other Point of Contact Name (new)`,"</br>")},
+      "</br>",
+      if(!is.na(selected_data2$Description)){paste0("<strong>Description:</strong> ",selected_data2$Description,"</br>")},
+      if(!is.na(selected_data2$`Impact`)){paste0("<strong>Impact Area:</strong> ", selected_data2$`Impact`,"</br>")},
+      "</br>",
+      if(!is.na(selected_data2$`Featured Link`)){paste0("<strong><a href = '",selected_data2$`Featured Link`,"' target='_blank'>Featured Engagement</a></strong>: ",selected_data2$`Featured Text`)},
+      "</br>",
+      "</br>",
+      tags$img(src = selected_data2$`Featured Photo`,width = "375px"),
+      "</br>"
+    ))
+    
+  })
+  
+  output$table_df <- ({})
+  
+  if(!is.null(values$school) | !is.null(values$theme_select)){
+    output$back_button <- renderUI({
+      actionButton(
+        inputId = "back",
+        label = "Back to Filter",
+        style="background: #3d464e;color: #f0f0f0;"
+      )
+    })
+    
+    if(!is.null(values$school)){values$school_filter <- "yes"}
+    if(is.null(values$school) & !is.null(values$theme_select)){
+      values$school_filter <- "no"
+      values$theme_filter <-"yes"
+    }
+    if(!is.null(values$theme_select)){values$theme_filter <- "yes"}
+    if(!is.null(values$school) & is.null(values$theme_select)){
+      values$school_filter <- "yes"
+      values$theme_filter <-"no"
+    }
+    
+  }else{
+    output$back_button <- renderUI({
+      actionButton(
+        inputId = "back",
+        label = "Back to All",
+        style="background: #3d464e;color: #f0f0f0;"
+      )
+    })
+    
+    values$school_filter <- "no"
+    values$theme_filter <- "no"
+  }
+  
+  output$menu <- renderUI({})
+  output$submit_button <- renderUI({})
+  
+  test <- 
+    selected_data2 %>% 
+    extract(geometry, c('lat', 'lon'), '\\((.*), (.*)\\)', convert = TRUE)
+  
+  leafletProxy("map") %>%
+    clearMarkerClusters() %>% 
+    clearMarkers() %>% 
+    addAwesomeMarkers(
+      data = selected_data2,
+      icon = icons,
+      label = ~`Campus Hubs`,
+      layerId = ~`Campus Hubs`,
+      options = pathOptions(
+        pane = "selectable_hubs"
+      )
+    )%>% 
+    flyTo(
+      lng = test$lat, 
+      lat = test$lon,
+      zoom = 18
+    ) 
+  
+})
+```
+
+```{r}
+observeEvent(input$map_click, {
+  
+  values$theme_select <- NULL
+  
+  output$theme_box <- renderUI({
+      selectizeInput(
+        "theme_select_box",
+        label = "Filter by Impact Area: ",
+        choices = c(unique_themes),
+        selected = values$theme_select,
+        multiple = TRUE,
+        options = list(placeholder = "All Categories")
+      )
+    })
+  
+  values$school <- NULL
+  
+  output$school_box <- renderUI({})
+  
+  output$text <- text_home
+  
+  output$text_descriptive <- renderUI({})
+  
+  output$infotext <- renderUI({
+    HTML(paste(
+      "",
+      "",
+      "Managed by: <a href = https://community.stanford.edu/ target='_blank'>Stanford Office of Community Engagement</a>",
+      "Contact us at: merryp@stanford.edu",
+      "",
+      "",
+      "This interactive map represents Stanford’s engagement with the communities the university touches. It is intended to be a dynamic resource that illustrates Stanford’s many Community Engagement Hubs. OCE defines “Community Engagement Hubs” as the offices and units at Stanford that are able to:",
+      "<ul><li>Point to one or more sustained partnerships with actionable work</li><li>Support dedicated staff to sustain the partnership and engage faculty and students</li><li>Practice <a href = https://haas.stanford.edu/about/our-approach/principles-ethical-and-effective-service/ target='_blank'>ethical and effective service</a>, are centered on co-learning, and respond to needs identified by those closest to those needs.</li><li>Are eager to elevate community engagement at Stanford, support colleagues and advance the institution.</li></ul>",
+      "How to Navigate: ",
+      "Click on the \"Impact Area\" dropdown menu to sort by engagement categories. Select the icons (in the icon view) or the school dropdown menu (in the list view) to sort based on Stanford schools and enter list view. Click on the map markers or list items to display more information about a specific hub. To go back to the list view, click the \"Back to all\" button. To go back to the icon view, click anywhere on the map that's not a marker.",
+      sep = "<br>"
+    ))
+  })
+  
+  output$table_df <- renderUI({})
+  
+  output$menu <- menu
+  
+  output$submit_button <- renderUI({
+    actionButton(
+      "submit",
+      label ="Add or Modify a Hub", 
+      onclick ="window.open('https://airtable.com/shr2a0fVHYMZc0OJI', '_blank')",
+      width = "50%",
+      style = "background: #3d464e;color: #f0f0f0;"
+      
+    )
+  })
+  
+  leafletProxy("map") %>%
+    clearMarkerClusters() %>% 
+    clearMarkers() %>% 
+    addAwesomeMarkers(
+      data = data,
+      icon = icons,
+      label = ~`Campus Hubs`,
+      layerId = ~`Campus Hubs`,
+      options = pathOptions(
+        pane = "selectable_hubs"
+      ),
+      clusterOptions = markerClusterOptions(
+        showCoverageOnHover = F,
+        freezeAtZoom = "maxKeepSpiderfy"
+      )
+    ) %>% 
+    flyTo(
+      lng = -122.17014,
+      lat = 37.42752,
+      zoom = 15
+    )
+  
+  output$back_button <- renderUI({})
+  
+  values$radio_indicator <- "icon"
+ 
+})
+```
+
+```{r}
+observeEvent(input$table_rows_selected,{
+  
+  output$school_box <- renderUI({})
+  output$theme_box <- renderUI({})
+  output$infotext <- renderUI({})
+  
+  data_go <- data
+  
+  if(values$name_list != ""){
+    rel_name <- values$name_list[input$table_rows_selected]
+    
+    test <- 
+      data_go %>% 
+      filter(`Campus Hubs` %in% rel_name) %>% 
+      extract(geometry, c('lat', 'lon'), '\\((.*), (.*)\\)', convert = TRUE)
+    
+    selected_data <- test
+    
+    selected_data2 <- 
+      data_go %>% 
+      filter(`Campus Hubs` %in% rel_name)
+  }else{
+    test <- 
+      data_go[input$table_rows_selected,] %>% 
+      extract(geometry, c('lat', 'lon'), '\\((.*), (.*)\\)', convert = TRUE)
+    
+    selected_data <- test
+    
+    selected_data2 <- 
+      data_go[input$table_rows_selected,]
+  }
+  
+  leafletProxy("map") %>%
+    clearMarkerClusters() %>% 
+    clearMarkers() %>% 
+    addAwesomeMarkers(
+      data = selected_data2,
+      icon = icons,
+      label = ~`Campus Hubs`,
+      layerId = ~`Campus Hubs`,
+      options = pathOptions(
+        pane = "selectable_hubs"
+      )
+    )%>% 
+    flyTo(
+      lng = test$lat, 
+      lat = test$lon,
+      zoom = 18
+    ) 
+
+  output$text <- renderUI({
+    
+    HTML(paste(
+      paste0("<a href='",selected_data2$URL,"' target='_blank'>",h1(strong(selected_data2$`Campus Hubs`)),"</a>",collapse = "")
+    ))      
+  })
+
+  output$text_descriptive <- renderUI({
+    
+    HTML(paste(
+      "</br>",
+      "</br>",
+      if(!is.na(selected_data2$`Logo`)){tags$img(src = selected_data2$`Logo`,width = "180px")},
+      if(!is.na(selected_data2$`Logo`)){paste0("</br>","</br>")},
+      if(!is.na(selected_data2$Address)){paste0("<strong>Address:</strong> ",selected_data2$Address,"</br>")},
+      if(!is.na(selected_data2$school_official)){paste0("<strong>Stanford Unit:</strong> ",selected_data2$school_official,"</br>")},
+      if(!is.na(selected_data2$`Director Name (new)`)){paste0("<strong>Faculty Director Name:</strong> ",selected_data2$`Director Name (new)`,"</br>")},
+      if(!is.na(selected_data2$`Other Point of Contact Name (new)`)){paste0("<strong>Points of Contact:</strong> ",selected_data2$`Other Point of Contact Name (new)`,"</br>")},
+      #if(!is.na(selected_data2$`Other Email (new)`)){paste0("<strong>Points of Contact Emails:</strong> ",selected_data2$`Other Email (new)`,"</br>")},
+      "</br>",
+      if(!is.na(selected_data2$Description)){paste0("<strong>Description:</strong> ",selected_data2$Description,"</br>")},
+      if(!is.na(selected_data2$`Impact`)){paste0("<strong>Impact Area:</strong> ", selected_data2$`Impact`,"</br>")},
+      "</br>",
+      if(!is.na(selected_data2$`Featured Link`)){paste0("<strong><a href = '",selected_data2$`Featured Link`,"' target='_blank'>Featured Engagement</a></strong>: ",selected_data2$`Featured Text`)},
+      "</br>",
+      "</br>",
+      tags$img(src = selected_data2$`Featured Photo`,width = "375px"),
+      "</br>"
+    ))
+    
+  })
+
+  output$table_df <- ({})
+  
+  if(!is.null(values$school) | !is.null(values$theme_select)){
+    output$back_button <- renderUI({
+      actionButton(
+        inputId = "back",
+        label = "Back to Filter",
+        style="background: #3d464e;color: #f0f0f0;"
+      )
+    })
+    
+    if(!is.null(values$school)){values$school_filter <- "yes"}
+    if(is.null(values$school) & !is.null(values$theme_select)){
+      values$school_filter <- "no"
+      values$theme_filter <-"yes"
+    }
+    if(!is.null(values$theme_select)){values$theme_filter <- "yes"}
+    if(!is.null(values$school) & is.null(values$theme_select)){
+      values$school_filter <- "yes"
+      values$theme_filter <-"no"
+    }
+    
+  }else{
+    output$back_button <- renderUI({
+      actionButton(
+        inputId = "back",
+        label = "Back to All",
+        style="background: #3d464e;color: #f0f0f0;"
+      )
+    })
+    
+    values$school_filter <- "no"
+    values$theme_filter <- "no"
+  }
+  
+})
+```
+
+```{r}
+observeEvent(input$back,{
+  
+  # print(values$radio_indicator)
+  
+  if(values$radio_indicator == "icon"){
+    
+    output$infotext <- renderUI({
+      HTML(paste(
+        "",
+        "",
+        "Managed by: <a href = https://community.stanford.edu/ target='_blank'>Stanford Office of Community Engagement</a>",
+        "Contact us at: merryp@stanford.edu",
+        "",
+        "",
+        "This interactive map represents Stanford’s engagement with the communities the university touches. It is intended to be a dynamic resource that illustrates Stanford’s many Community Engagement Hubs. OCE defines “Community Engagement Hubs” as the offices and units at Stanford that are able to:",
+        "<ul><li>Point to one or more sustained partnerships with actionable work</li><li>Support dedicated staff to sustain the partnership and engage faculty and students</li><li>Practice <a href = https://haas.stanford.edu/about/our-approach/principles-ethical-and-effective-service/ target='_blank'>ethical and effective service</a>, are centered on co-learning, and respond to needs identified by those closest to those needs.</li><li>Are eager to elevate community engagement at Stanford, support colleagues and advance the institution.</li></ul>",
+        "How to Navigate: ",
+        "Click on the \"Impact Area\" dropdown menu to sort by engagement categories. Select the icons (in the icon view) or the school dropdown menu (in the list view) to sort based on Stanford schools and enter list view. Click on the map markers or list items to display more information about a specific hub. To go back to the list view, click the \"Back to all\" button. To go back to the icon view, click anywhere on the map that's not a marker.",
+        sep = "<br>"
+      ))
+    })
+    
+    output$school_box <- renderUI({})
+    
+    output$text <- text_home
+    
+    output$text_descriptive <- renderUI({})
+    
+    output$theme_box <- renderUI({
+      selectizeInput(
+        "theme_select_box",
+        label = "Filter by Impact Area: ",
+        choices = c(unique_themes),
+        selected = values$theme_select,
+        multiple = TRUE,
+        options = list(placeholder = "All Categories")
+      )
+    })
+    
+    output$table_df <- renderUI({})
+    
+    output$menu <- menu
+    
+    output$submit_button <- renderUI({
+      actionButton(
+        "submit",
+        label ="Add or Modify a Hub", 
+        onclick ="window.open('https://airtable.com/shr2a0fVHYMZc0OJI', '_blank')",
+        width = "50%",
+        style = "background: #3d464e;color: #f0f0f0;"
+        
+      )
+    })
+    
+    output$back_button <- renderUI({})
+    
+    values$school <- NULL
+    values$theme_select <- NULL
+    
+    leafletProxy("map") %>%
+    clearMarkerClusters() %>% 
+    clearMarkers() %>% 
+    addAwesomeMarkers(
+      data = data,
+      icon = icons,
+      label = ~`Campus Hubs`,
+      layerId = ~`Campus Hubs`,
+      options = pathOptions(
+        pane = "selectable_hubs"
+      ),
+      clusterOptions = markerClusterOptions(
+        showCoverageOnHover = F,
+        freezeAtZoom = "maxKeepSpiderfy"
+      )
+    ) %>% 
+    flyTo(
+      lng = -122.17014,
+      lat = 37.42752,
+      zoom = 15
+    )
+    
+  }else if(values$radio_indicator == "list"){
+    
+    if(values$school_filter == "no"){values$school <- NULL}
+    if(values$theme_filter == "no"){values$theme_select <- NULL}
+    output$infotext <- renderUI({})
+    
+    output$text <- text_home
+    
+    output$text_descriptive <- renderUI({})
+    
+    output$back_button <- renderUI({})
+    
+    output$theme_box <- renderUI({
+      selectizeInput(
+        "theme_select_box",
+        label = "Filter by Impact Area: ",
+        choices = c(unique_themes),
+        selected = values$theme_select,
+        multiple = TRUE,
+        options = list(placeholder = "All Categories")
+      )
+    })
+    
+    output$school_box <- renderUI({
+      selectizeInput(
+        "school_select_box",
+        label = "Filter by Stanford Unit: ",
+        choices = c(unique_schools),
+        selected = values$school,
+        multiple = TRUE,
+        options = list(placeholder = "All Schools")
+      )
+    })
+    
+    output$menu <- renderUI({})
+    output$submit_button <- renderUI({})
+    
+    if(values$school_filter == "no" & values$theme_filter == "no"){
+      
+      display_data <- data %>%
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      leafletProxy("map") %>%
+        clearMarkerClusters() %>% 
+        clearMarkers() %>% 
+        addAwesomeMarkers(
+          data = data,
+          icon = icons,
+          label = ~`Campus Hubs`,
+          layerId = ~`Campus Hubs`,
+          options = pathOptions(
+            pane = "selectable_hubs"
+          ),
+          clusterOptions = markerClusterOptions(
+            showCoverageOnHover = F,
+            freezeAtZoom = "maxKeepSpiderfy"
+          )
+        ) %>% 
+        flyTo(
+          lng = -122.17014,
+          lat = 37.42752,
+          zoom = 15
+        )
+    }else{
+      if(values$school_filter == "yes" & values$theme_filter == "no"){
+        # print("1")
+        display_data <- data %>%
+          filter(grepl(paste(values$school, collapse = "|"), school_official))  %>% 
+          dplyr::select(`Campus Hubs`) %>%
+          st_set_geometry(NULL) %>%
+          filter(!duplicated(`Campus Hubs`))
+        
+        map_data <- 
+          data %>%
+          filter(grepl(paste(values$school, collapse = "|"), school_official)) 
+      }else if(values$school_filter == "yes" & values$theme_filter == "yes"){
+        # print("2")
+        display_data <- data %>%
+          filter(grepl(paste(values$school, collapse = "|"), school_official))  %>% 
+          filter(grepl(paste(values$theme_select, collapse = "|"),Impact)) %>% 
+          dplyr::select(`Campus Hubs`) %>%
+          st_set_geometry(NULL) %>%
+          filter(!duplicated(`Campus Hubs`))
+        
+        map_data <- 
+          data %>%
+          filter(grepl(paste(values$school, collapse = "|"), school_official))  %>% 
+          filter(grepl(paste(values$theme_select, collapse = "|"),Impact))
+      }else if(values$school_filter == "no" & values$theme_filter == "yes"){
+        # print("3")
+        display_data <- data %>%
+          filter(grepl(paste(values$theme_select, collapse = "|"),Impact)) %>% 
+          dplyr::select(`Campus Hubs`) %>%
+          st_set_geometry(NULL) %>%
+          filter(!duplicated(`Campus Hubs`))
+        
+        map_data <- 
+          data %>%
+          filter(grepl(paste(values$theme_select, collapse = "|"),Impact))
+      }
+      
+      display_data <- map_data %>% 
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      leafletProxy("map") %>%
+        clearMarkerClusters() %>% 
+        clearMarkers() %>% 
+        addAwesomeMarkers(
+          data = map_data,
+          icon = icons,
+          label = ~`Campus Hubs`,
+          layerId = ~`Campus Hubs`,
+          options = pathOptions(
+            pane = "selectable_hubs"
+          ),
+          clusterOptions = markerClusterOptions(
+            showCoverageOnHover = F,
+            freezeAtZoom = "maxKeepSpiderfy"
+          )
+        ) %>% 
+        flyTo(
+          lng = -122.17014,
+          lat = 37.42752,
+          zoom = 15
+        )
+    }
+    
+    output$table_df <- renderUI({
+      dataTableOutput('table')
+    })
+    
+    
+    output$table <- renderDataTable(
+      display_data,
+      options = list(
+        pageLength = nrow(display_data),
+        lengthChange = FALSE,
+        bFilter=1,
+        bInfo=0,
+        bLengthChange=0,
+        searchHighlight = TRUE,
+        dom = 'ft'
+      ),
+      selection = 'single',
+      rownames = FALSE
+    )
+    
+    
+  }
+  
+  
+})
+
+```
+
+
+```{r}
+observeEvent(input$button1, {
+  
+  values$school <- NULL
+  values$theme$select <- NULL
+
+  output$infotext <- renderUI({})
+    
+    values$radio_indicator <- "list"
+    
+    output$theme_box <- renderUI({
+      selectizeInput(
+        "theme_select_box",
+        label = "Filter by Impact Area: ",
+        choices = c(unique_themes),
+        selected = values$theme_select,
+        multiple = TRUE,
+        options = list(placeholder = "All Categories")
+      )
+    })
+    
+    output$school_box <- renderUI({
+      selectizeInput(
+        "school_select_box",
+        label = "Filter by Stanford Unit: ",
+        choices = c(unique_schools),
+        selected = values$school,
+        multiple = TRUE,
+        options = list(placeholder = "All Schools")
+      )
+    })
+    
+    
+    output$menu <- renderUI({})
+    output$submit_button <- renderUI({})
+    
+    if(!is.null(values$school)){
+      
+      display_data <- data %>%
+        filter(school_official %in% values$school) %>% 
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }else{
+      display_data <- data %>%
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }
+})
+
+observeEvent(input$button2, {
+  
+  values$school <- "Dean of Research"
+
+  output$infotext <- renderUI({})
+    
+    values$radio_indicator <- "list"
+    
+    output$theme_box <- renderUI({
+      selectizeInput(
+        "theme_select_box",
+        label = "Filter by Impact Area: ",
+        choices = c(unique_themes),
+        selected = values$theme_select,
+        multiple = TRUE,
+        options = list(placeholder = "All Categories")
+      )
+    })
+    
+    output$school_box <- renderUI({
+      selectizeInput(
+        "school_select_box",
+        label = "Filter by Stanford Unit: ",
+        choices = c(unique_schools),
+        selected = values$school,
+        multiple = TRUE,
+        options = list(placeholder = "All Schools")
+      )
+    })
+    
+    
+    output$menu <- renderUI({})
+    output$submit_button <- renderUI({})
+    
+    if(!is.null(values$school)){
+      
+      display_data <- data %>%
+        filter(school_official %in% values$school) %>% 
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }else{
+      display_data <- data %>%
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+      
+    }
+  
+})
+
+observeEvent(input$button3, {
+  values$school <- "Graduate School of Business"
+
+  output$infotext <- renderUI({})
+    
+    values$radio_indicator <- "list"
+    
+    output$theme_box <- renderUI({
+      selectizeInput(
+        "theme_select_box",
+        label = "Filter by Impact Area: ",
+        choices = c(unique_themes),
+        selected = values$theme_select,
+        multiple = TRUE,
+        options = list(placeholder = "All Categories")
+      )
+    })
+    
+    output$school_box <- renderUI({
+      selectizeInput(
+        "school_select_box",
+        label = "Filter by Stanford Unit: ",
+        choices = c(unique_schools),
+        selected = values$school,
+        multiple = TRUE,
+        options = list(placeholder = "All Schools")
+      )
+    })
+    
+    output$menu <- renderUI({})
+    output$submit_button <- renderUI({})
+    
+    if(!is.null(values$school)){
+      
+      display_data <- data %>%
+        filter(school_official %in% values$school) %>% 
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }else{
+      display_data <- data %>%
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }
+})
+
+observeEvent(input$button4, {
+  
+  values$school <- "Graduate School of Education"
+
+  output$infotext <- renderUI({})
+    
+    values$radio_indicator <- "list"
+    
+    output$theme_box <- renderUI({
+      selectizeInput(
+        "theme_select_box",
+        label = "Filter by Impact Area: ",
+        choices = c(unique_themes),
+        selected = values$theme_select,
+        multiple = TRUE,
+        options = list(placeholder = "All Categories")
+      )
+    })
+    
+    output$school_box <- renderUI({
+      selectizeInput(
+        "school_select_box",
+        label = "Filter by Stanford Unit: ",
+        choices = c(unique_schools),
+        selected = values$school,
+        multiple = TRUE,
+        options = list(placeholder = "All Schools")
+      )
+    })
+    
+    output$menu <- renderUI({})
+    output$submit_button <- renderUI({})
+    
+    if(!is.null(values$school)){
+      
+      display_data <- data %>%
+        filter(school_official %in% values$school) %>% 
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }else{
+      display_data <- data %>%
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }
+})
+
+observeEvent(input$button5, {
+  
+  values$school <- "Provost"
+  
+  output$infotext <- renderUI({})
+    
+    values$radio_indicator <- "list"
+    
+    output$theme_box <- renderUI({
+      selectizeInput(
+        "theme_select_box",
+        label = "Filter by Impact Area: ",
+        choices = c(unique_themes),
+        selected = values$theme_select,
+        multiple = TRUE,
+        options = list(placeholder = "All Categories")
+      )
+    })
+    
+    output$school_box <- renderUI({
+      selectizeInput(
+        "school_select_box",
+        label = "Filter by Stanford Unit: ",
+        choices = c(unique_schools),
+        selected = values$school,
+        multiple = TRUE,
+        options = list(placeholder = "All Schools")
+      )
+    })
+    
+    
+    output$menu <- renderUI({})
+    output$submit_button <- renderUI({})
+    
+    if(!is.null(values$school)){
+      
+      display_data <- data %>%
+        filter(school_official %in% values$school) %>% 
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }else{
+      display_data <- data %>%
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }
+})
+
+observeEvent(input$button6, {
+  
+  values$school <- "School of Earth, Energy & Environmental Sciences"
+  
+  output$infotext <- renderUI({})
+    
+    values$radio_indicator <- "list"
+    
+    output$theme_box <- renderUI({
+      selectizeInput(
+        "theme_select_box",
+        label = "Filter by Impact Area: ",
+        choices = c(unique_themes),
+        selected = values$theme_select,
+        multiple = TRUE,
+        options = list(placeholder = "All Categories")
+      )
+    })
+    
+    output$school_box <- renderUI({
+      selectizeInput(
+        "school_select_box",
+        label = "Filter by Stanford Unit: ",
+        choices = c(unique_schools),
+        selected = values$school,
+        multiple = TRUE,
+        options = list(placeholder = "All Schools")
+      )
+    })
+    
+    output$menu <- renderUI({})
+    output$submit_button <- renderUI({})
+    
+    if(!is.null(values$school)){
+      
+      display_data <- data %>%
+        filter(school_official %in% values$school) %>% 
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }else{
+      display_data <- data %>%
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }
+})
+
+observeEvent(input$button7, {
+  values$school <- "School of Engineering"
+
+  output$infotext <- renderUI({})
+    
+    values$radio_indicator <- "list"
+    
+    output$theme_box <- renderUI({
+      selectizeInput(
+        "theme_select_box",
+        label = "Filter by Impact Area: ",
+        choices = c(unique_themes),
+        selected = values$theme_select,
+        multiple = TRUE,
+        options = list(placeholder = "All Categories")
+      )
+    })
+    
+    output$school_box <- renderUI({
+      selectizeInput(
+        "school_select_box",
+        label = "Filter by Stanford Unit: ",
+        choices = c(unique_schools),
+        selected = values$school,
+        multiple = TRUE,
+        options = list(placeholder = "All Schools")
+      )
+    })
+    
+    output$menu <- renderUI({})
+    output$submit_button <- renderUI({})
+    
+    if(!is.null(values$school)){
+      
+      display_data <- data %>%
+        filter(school_official %in% values$school) %>% 
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }else{
+      display_data <- data %>%
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }
+})
+
+observeEvent(input$button8, {
+  
+  values$school <- "School of Humanities & Sciences"
+
+  output$infotext <- renderUI({})
+    
+    values$radio_indicator <- "list"
+    
+    output$theme_box <- renderUI({
+      selectizeInput(
+        "theme_select_box",
+        label = "Filter by Impact Area: ",
+        choices = c(unique_themes),
+        selected = values$theme_select,
+        multiple = TRUE,
+        options = list(placeholder = "All Categories")
+      )
+    })
+    
+    output$school_box <- renderUI({
+      selectizeInput(
+        "school_select_box",
+        label = "Filter by Stanford Unit: ",
+        choices = c(unique_schools),
+        selected = values$school,
+        multiple = TRUE,
+        options = list(placeholder = "All Schools")
+      )
+    })
+    
+    
+    output$menu <- renderUI({})
+    output$submit_button <- renderUI({})
+    
+    if(!is.null(values$school)){
+      
+      display_data <- data %>%
+        filter(school_official %in% values$school) %>% 
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }else{
+      display_data <- data %>%
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }
+})
+
+observeEvent(input$button9, {
+  
+  values$school <- "School of Law"
+
+  output$infotext <- renderUI({})
+    
+    values$radio_indicator <- "list"
+    
+    output$theme_box <- renderUI({
+      selectizeInput(
+        "theme_select_box",
+        label = "Filter by Impact Area: ",
+        choices = c(unique_themes),
+        selected = values$theme_select,
+        multiple = TRUE,
+        options = list(placeholder = "All Categories")
+      )
+    })
+    
+    output$school_box <- renderUI({
+      selectizeInput(
+        "school_select_box",
+        label = "Filter by Stanford Unit: ",
+        choices = c(unique_schools),
+        selected = values$school,
+        multiple = TRUE,
+        options = list(placeholder = "All Schools")
+      )
+    })
+    
+    
+    output$menu <- renderUI({})
+    output$submit_button <- renderUI({})
+    
+    if(!is.null(values$school)){
+      
+      display_data <- data %>%
+        filter(school_official %in% values$school) %>% 
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }else{
+      display_data <- data %>%
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }
+})
+
+observeEvent(input$button10, {
+  
+  values$school <- "Stanford Medicine"
+
+  output$infotext <- renderUI({})
+    
+    values$radio_indicator <- "list"
+    
+    output$theme_box <- renderUI({
+      selectizeInput(
+        "theme_select_box",
+        label = "Filter by Impact Area: ",
+        choices = c(unique_themes),
+        selected = values$theme_select,
+        multiple = TRUE,
+        options = list(placeholder = "All Categories")
+      )
+    })
+    
+    output$school_box <- renderUI({
+      selectizeInput(
+        "school_select_box",
+        label = "Filter by Stanford Unit: ",
+        choices = c(unique_schools),
+        selected = values$school,
+        multiple = TRUE,
+        options = list(placeholder = "All Schools")
+      )
+    })
+    
+    
+    output$menu <- renderUI({})
+    output$submit_button <- renderUI({})
+    
+    if(!is.null(values$school)){
+      
+      display_data <- data %>%
+        filter(school_official %in% values$school) %>% 
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }else{
+      display_data <- data %>%
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }
+})
+
+observeEvent(input$button11, {
+  
+  values$school <- "Stanford Athletics"
+
+  output$infotext <- renderUI({})
+    
+    values$radio_indicator <- "list"
+    
+    output$theme_box <- renderUI({
+      selectizeInput(
+        "theme_select_box",
+        label = "Filter by Impact Area: ",
+        choices = c(unique_themes),
+        selected = values$theme_select,
+        multiple = TRUE,
+        options = list(placeholder = "All Categories")
+      )
+    })
+    
+    output$school_box <- renderUI({
+      selectizeInput(
+        "school_select_box",
+        label = "Filter by Stanford Unit: ",
+        choices = c(unique_schools),
+        selected = values$school,
+        multiple = TRUE,
+        options = list(placeholder = "All Schools")
+      )
+    })
+    
+    
+    output$menu <- renderUI({})
+    output$submit_button <- renderUI({})
+    
+    if(!is.null(values$school)){
+      
+      display_data <- data %>%
+        filter(school_official %in% values$school) %>% 
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }else{
+      display_data <- data %>%
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }
+})
+
+observeEvent(input$button12, {
+  
+  values$school <- "Vice President for the Arts"
+
+  output$infotext <- renderUI({})
+    
+    values$radio_indicator <- "list"
+    
+    output$theme_box <- renderUI({
+      selectizeInput(
+        "theme_select_box",
+        label = "Filter by Impact Area: ",
+        choices = c(unique_themes),
+        selected = values$theme_select,
+        multiple = TRUE,
+        options = list(placeholder = "All Categories")
+      )
+    })
+    
+    output$school_box <- renderUI({
+      selectizeInput(
+        "school_select_box",
+        label = "Filter by Stanford Unit: ",
+        choices = c(unique_schools),
+        selected = values$school,
+        multiple = TRUE,
+        options = list(placeholder = "All Schools")
+      )
+    })
+    
+    
+    output$menu <- renderUI({})
+    output$submit_button <- renderUI({})
+    
+    if(!is.null(values$school)){
+      
+      display_data <- data %>%
+        filter(school_official %in% values$school) %>% 
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }else{
+      display_data <- data %>%
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }
+})
+
+observeEvent(input$button13, {
+  
+  values$school <- "Vice Provost for Graduate Education"
+
+  output$infotext <- renderUI({})
+    
+    values$radio_indicator <- "list"
+    
+    output$theme_box <- renderUI({
+      selectizeInput(
+        "theme_select_box",
+        label = "Filter by Impact Area: ",
+        choices = c(unique_themes),
+        selected = values$theme_select,
+        multiple = TRUE,
+        options = list(placeholder = "All Categories")
+      )
+    })
+    
+    output$school_box <- renderUI({
+      selectizeInput(
+        "school_select_box",
+        label = "Filter by Stanford Unit: ",
+        choices = c(unique_schools),
+        selected = values$school,
+        multiple = TRUE,
+        options = list(placeholder = "All Schools")
+      )
+    })
+    
+    
+    output$menu <- renderUI({})
+    output$submit_button <- renderUI({})
+    
+    if(!is.null(values$school)){
+      
+      display_data <- data %>%
+        filter(school_official %in% values$school) %>% 
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }else{
+      display_data <- data %>%
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }
+})
+
+observeEvent(input$button14, {
+  
+  values$school <- "Vice Provost for Undergraduate Education"
+
+  output$infotext <- renderUI({})
+    
+    values$radio_indicator <- "list"
+    
+    output$theme_box <- renderUI({
+      selectizeInput(
+        "theme_select_box",
+        label = "Filter by Impact Area: ",
+        choices = c(unique_themes),
+        selected = values$theme_select,
+        multiple = TRUE,
+        options = list(placeholder = "All Categories")
+      )
+    })
+    
+    output$school_box <- renderUI({
+      selectizeInput(
+        "school_select_box",
+        label = "Filter by Stanford Unit: ",
+        choices = c(unique_schools),
+        selected = values$school,
+        multiple = TRUE,
+        options = list(placeholder = "All Schools")
+      )
+    })
+    
+    
+    output$menu <- renderUI({})
+    output$submit_button <- renderUI({})
+    
+    if(!is.null(values$school)){
+      
+      display_data <- data %>%
+        filter(school_official %in% values$school) %>% 
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }else{
+      display_data <- data %>%
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }
+})
+```
+
+```{r}
+observeEvent(input$radio,{
+  
+  output$school_box <- renderUI({})
+  
+  output$text <- text_home
+  
+  output$text_descriptive <- renderUI({})
+  
+  
+  if(input$radio == "Icon View"){
+    
+    values$radio_indicator <- "icon"
+    
+    output$table_df <- renderUI({})
+    
+    output$infotext <- renderUI({
+      HTML(paste(
+        "",
+        "",
+        "Managed by: <a href = https://community.stanford.edu/ target='_blank'>Stanford Office of Community Engagement</a>",
+        "Contact us at: merryp@stanford.edu",
+        "",
+        "",
+        "This interactive map represents Stanford’s engagement with the communities the university touches. It is intended to be a dynamic resource that illustrates Stanford’s many Community Engagement Hubs. OCE defines “Community Engagement Hubs” as the offices and units at Stanford that are able to:",
+        "<ul><li>Point to one or more sustained partnerships with actionable work</li><li>Support dedicated staff to sustain the partnership and engage faculty and students</li><li>Practice <a href = https://haas.stanford.edu/about/our-approach/principles-ethical-and-effective-service/ target='_blank'>ethical and effective service</a>, are centered on co-learning, and respond to needs identified by those closest to those needs.</li><li>Are eager to elevate community engagement at Stanford, support colleagues and advance the institution.</li></ul>",
+        "How to Navigate: ",
+        "Click on the \"Impact Area\" dropdown menu to sort by engagement categories. Select the icons (in the icon view) or the school dropdown menu (in the list view) to sort based on Stanford schools and enter list view. Click on the map markers or list items to display more information about a specific hub. To go back to the list view, click the \"Back to all\" button. To go back to the icon view, click anywhere on the map that's not a marker.",
+        sep = "<br>"
+      ))
+    })
+    
+    output$menu <- menu
+    
+    output$submit_button <- renderUI({
+      actionButton(
+        "submit",
+        label ="Add or Modify a Hub", 
+        onclick ="window.open('https://airtable.com/shr2a0fVHYMZc0OJI', '_blank')",
+        width = "50%",
+        style = "background: #3d464e;color: #f0f0f0;"
+        
+      )
+    })
+    
+    
+  }else if(input$radio == "List View"){
+    
+    output$infotext <- renderUI({})
+    
+    values$radio_indicator <- "list"
+    
+    output$theme_box <- renderUI({
+      selectizeInput(
+        "theme_select_box",
+        label = "Filter by Impact Area: ",
+        choices = c(unique_themes),
+        selected = values$theme_select,
+        multiple = TRUE,
+        options = list(placeholder = "All Categories")
+      )
+    })
+    
+    output$school_box <- renderUI({
+      selectizeInput(
+        "school_select_box",
+        label = "Filter by Stanford Unit: ",
+        choices = c(unique_schools),
+        selected = values$school,
+        multiple = TRUE,
+        options = list(placeholder = "All Schools")
+      )
+    })
+    
+    output$menu <- renderUI({})
+    output$submit_button <- renderUI({})
+    
+    if(!is.null(values$school)){
+      
+      display_data <- data %>%
+        filter(school_official %in% values$school) %>% 
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+    }else{
+      display_data <- data %>%
+        dplyr::select(`Campus Hubs`) %>%
+        st_set_geometry(NULL) %>%
+        filter(!duplicated(`Campus Hubs`))
+      
+      output$table_df <- renderUI({
+        dataTableOutput('table')
+      })
+      
+      
+      output$table <- renderDataTable(
+        display_data,
+        options = list(
+          pageLength = nrow(display_data),
+          lengthChange = FALSE,
+          bFilter=1,
+          bInfo=0,
+          bLengthChange=0,
+          searchHighlight = TRUE,
+          dom = 'ft'
+        ),
+        selection = 'single',
+        rownames = FALSE
+      )
+      
+    }
+    
+  }
+  
+})
+
+```
+
+```{r}
+observeEvent(input$theme_select_box,ignoreNULL = FALSE,{
+  
+  # print(nrow(data))
+  # print(unique(data$Impact))
+  
+  values$theme_select <- input$theme_select_box
+
+  if(!is.null(values$theme_select)){
+    if(!is.null(values$school)){
+      
+      selectable_hubs <- 
+        data %>% 
+        filter(grepl(paste(values$school, collapse = "|"), school_official))  %>% 
+        filter(grepl(paste(values$theme_select, collapse = "|"),Impact))
+      
+    }else{
+      
+      selectable_hubs <- 
+        data %>% 
+        filter(grepl(paste(values$theme_select, collapse = "|"),Impact))
+      
+      # print(nrow(selectable_hubs))
+      
+    }
+    
+    if(nrow(selectable_hubs) > 0){
+      values$name_list <- unique(selectable_hubs$`Campus Hubs`)
+      
+      leafletProxy('map') %>%
+        clearMarkerClusters() %>% clearMarkers()
+      
+      leafletProxy("map") %>%
+        addAwesomeMarkers(
+          data = selectable_hubs,
+          icon = icons,
+          label = ~`Campus Hubs`,
+          layerId = ~`Campus Hubs`,
+          options = pathOptions(
+            pane = "selectable_hubs"
+          ),
+          clusterOptions = markerClusterOptions(
+            showCoverageOnHover = F,
+            freezeAtZoom = "maxKeepSpiderfy"
+          )
+        )
+    }else{
+      leafletProxy("map") %>%
+        clearMarkerClusters() %>% clearMarkers()
+    }
+  }else{
+
+    if(!is.null(values$school)){
+      selectable_hubs <-
+        data %>% 
+        filter(grepl(paste(values$school, collapse = "|"), school_official))
+      
+      values$name_list <- unique(selectable_hubs$`Campus Hubs`)
+    }else{
+      selectable_hubs <- data
+    }
+    
+    leafletProxy('map') %>%
+      clearMarkerClusters() %>% clearMarkers()
+    
+    leafletProxy("map") %>%
+      addAwesomeMarkers(
+        data = selectable_hubs,
+        icon = icons,
+        label = ~`Campus Hubs`,
+        layerId = ~`Campus Hubs`,
+        options = pathOptions(
+          pane = "selectable_hubs"
+        ),
+        clusterOptions = markerClusterOptions(
+          showCoverageOnHover = F,
+          freezeAtZoom = "maxKeepSpiderfy"
+        )
+      )
+    
+  }
+  
+  
+  if(values$radio_indicator == "list"){
+    display_data <- 
+      selectable_hubs %>% 
+      dplyr::select(`Campus Hubs`) %>% 
+      st_set_geometry(NULL)
+    
+    output$table <- renderDataTable(
+      display_data,
+      options = list(
+        pageLength = nrow(display_data),
+        lengthChange = FALSE,
+        bFilter=1,
+        bInfo=0,
+        bLengthChange=0,
+        searchHighlight = TRUE,
+        dom = 'ft'
+      ),
+      selection = 'single',
+      rownames = FALSE
+    )
+  }
+  
+})
+```
+
+```{r}
+observeEvent(input$school_select_box,ignoreNULL = FALSE,{
+  
+  values$school <- input$school_select_box
+  
+  
+  if(is.null(values$theme_select)){
+    
+    if(!is.null(values$school)){
+      
+      selectable_hubs <- 
+        data %>% 
+        filter(grepl(paste(values$school %>% map(~gsub("^Provost","^Provost|\"Provost",.)) %>% unlist(), collapse = "|"), school_official))
+    }else{
+      selectable_hubs <- 
+        data
+    }
+  }else{
+    if(!is.null(values$school)){
+      selectable_hubs <- 
+        data %>% 
+        filter(grepl(paste(values$school %>% map(~gsub("^Provost","^Provost|\"Provost",.)) %>% unlist(), collapse = "|"), school_official))  %>%
+        filter(grepl(paste(values$theme_select, collapse = "|"),Impact))
+    }else{
+      selectable_hubs <- 
+        data %>% 
+        filter(grepl(paste(values$theme_select, collapse = "|"),Impact))
+    }
+  }
+  
+  if(nrow(selectable_hubs) > 0){
+    values$name_list <- unique(selectable_hubs$`Campus Hubs`)
+    
+    
+    leafletProxy('map') %>%
+      clearMarkerClusters() %>% clearMarkers()
+    
+    leafletProxy("map") %>%
+      addAwesomeMarkers(
+        data = selectable_hubs,
+        icon = icons,
+        label = ~`Campus Hubs`,
+        layerId = ~`Campus Hubs`,
+        options = pathOptions(
+          pane = "selectable_hubs"
+        ),
+        clusterOptions = markerClusterOptions(
+          showCoverageOnHover = F,
+          freezeAtZoom = "maxKeepSpiderfy"
+        )
+      )
+    
+  }else{
+    leafletProxy("map") %>%
+      clearMarkerClusters() %>% clearMarkers()
+  }
+  
+  display_data <- 
+    selectable_hubs %>% 
+    dplyr::select(`Campus Hubs`) %>% 
+    st_set_geometry(NULL)
+  
+  output$table <- renderDataTable(
+    display_data,
+    options = list(
+      pageLength = nrow(display_data),
+      lengthChange = FALSE,
+      bFilter=1,
+      bInfo=0,
+      bLengthChange=0,
+      searchHighlight = TRUE,
+      dom = 'ft'
+    ),
+    selection = 'single',
+    rownames = FALSE
+  )
+  
+})
+```
