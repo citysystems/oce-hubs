@@ -14,10 +14,13 @@ RUN apt-get update && apt-get install -y \
     libprotobuf-dev \
     protobuf-compiler \
     cargo \
+    libmagick++-dev \
+    libharfbuzz-dev \
+    libfribidi-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # basic shiny functionality
-RUN R -e "install.packages(c('tidyverse', 'shiny', 'rmarkdown', 'knitr', 'flexdashboard', 'mapboxapi', 'sf', 'leaflet', 'DT'), dependencies = T, repo='http://cran.r-project.org')"
+RUN R -e "install.packages(c('shiny', 'rmarkdown', 'knitr', 'flexdashboard', 'readr', 'dplyr', 'purrr', 'tidyr', 'mapboxapi', 'sf', 'leaflet', 'DT'), dependencies = T, repo='http://cran.r-project.org')"
 
 # copy the app to the image
 RUN mkdir /root/oce_hubs
