@@ -190,16 +190,6 @@ while(i <= 15){
 }
 
 menu <- renderUI(menu_list)
-
-values <- reactiveValues(
-  previous = "",
-  school = NULL,
-  name_list = "",
-  radio_indicator = "icon",
-  theme_select = NULL,
-  school_filter = "no",
-  theme_filter = "no"
-)
 ```
 
 Sidebar {.sidebar data-width=500}
@@ -256,6 +246,16 @@ uiOutput("infotext")
 ```
 
 ```{r, context = "server"}
+values <- reactiveValues(
+  previous = "",
+  school = NULL,
+  name_list = "",
+  radio_indicator = "icon",
+  theme_select = NULL,
+  school_filter = "no",
+  theme_filter = "no"
+)
+
 output$theme_select_box <- renderUI({})
 
 output$text <- text_home
