@@ -161,7 +161,7 @@ infotext <- renderUI({
     "",
     "",
     "This interactive map represents Stanford’s engagement with the communities the university touches. It is intended to be a dynamic resource that illustrates Stanford’s many Community Engagement Hubs. OCE defines “Community Engagement Hubs” as the offices and units at Stanford that are able to:",
-    "<ul><li>Point to one or more sustained partnerships with actionable work</li><li>Dedicate resources to sustain the partnership and engage faculty, staff, and students</li><li>Practice <a href = https://haas.stanford.edu/about/our-approach/principles-ethical-and-effective-service/ target='_blank'>ethical and effective service</a></li></ul>",
+    "<ul><li>Point to one or more sustained partnerships with actionable work</li><li>Dedicate resources to sustain the community partnership and engage faculty, staff, and students</li><li>Practice <a href = https://haas.stanford.edu/about/our-approach/principles-ethical-and-effective-service/ target='_blank'>ethical and effective service</a></li></ul>",
     "How to Navigate: ",
     "Click on the \"Impact Area\" dropdown menu to sort by engagement categories. Select the icons (in the icon view) or the school dropdown menu (in the list view) to sort based on Stanford schools and enter list view and enter list view. Click on the map markers or list items to display more information about a specific hub. To go back to the list view, click the \"Back to all\" button. To go back to the icon view, click anywhere on the map that's not a marker.",
     sep = "<br>"
@@ -181,6 +181,30 @@ back_all <- renderUI({
     inputId = "back",
     label = "Back to All",
     style="background: #3d464e;color: #f0f0f0;"
+  )
+})
+
+back_projects <- renderUI({
+  actionButton(
+    inputId = "back",
+    label = "Back to Projects",
+    style="background: transparent; border: none; outline: none; color: #1A1A1A; margin-bottom: -10px; margin-left: -15px;"
+  )
+})
+
+back_home <- renderUI({
+  actionButton(
+    inputId = "back",
+    label = "Back to Home",
+    style="background: transparent; border: none; outline: none; color: #1A1A1A; margin-bottom: -10px; margin-left: -15px;"
+  )
+})
+
+empty_button <- renderUI({
+  actionButton(
+    inputId = "empty",
+    label = "-",
+    style="background: transparent; border: none; outline: none; color: transparent; margin-bottom: -10px;"
   )
 })
 
@@ -233,15 +257,6 @@ Community Engagement Hub Map {.sidebar data-width=500}
 
 ```{r}
 uiOutput("sidebar2", style = "overflow-y: auto; width: 100% !important; height: 100% !important;")
-# uiOutput("back_button")
-# uiOutput("text")
-# uiOutput("text_descriptive")
-# uiOutput("theme_box")
-# uiOutput("school_box")
-# uiOutput("table_df")
-# uiOutput("menu", style = "display:inline-block;width: 470px;")
-# uiOutput("submit_button", style="display: inline-block;vertical-align:top; width: 450px;margin-top:30px;", align = "center")
-# uiOutput("infotext")
 ```
 
 ```{r, context = "server"}
@@ -259,6 +274,7 @@ values <- reactiveValues(
 output$sidebar2 <- renderUI({
   tagList(
     div(id = "placeholder_back_button"),
+    uiOutput("back_button", style = "height: fit-content !important;"),
     uiOutput("text", style = "height: fit-content !important;"),
     div(id = "placeholder_text_descriptive"),
     div(id = "placeholder_theme_box"),
@@ -273,6 +289,8 @@ output$sidebar2 <- renderUI({
     uiOutput("infotext")
   )
 })
+
+output$back_button <- empty_button
 
 output$text <- text_home
 
@@ -371,7 +389,6 @@ observeEvent(input$map_marker_click,{
   })
   
   removeUI("#text_descriptive")
-  insertUI("#placeholder_text_descriptive","afterEnd",ui = uiOutput("text_descriptive"))
   output$text_descriptive <- renderUI({
     
     HTML(paste(
@@ -395,13 +412,13 @@ observeEvent(input$map_marker_click,{
     ))
     
   })
+  insertUI("#placeholder_text_descriptive","afterEnd",ui = uiOutput("text_descriptive"))
   
   if(!is.null(values$school) | !is.null(values$theme_select)){
     
-    removeUI("#back_button")
-    insertUI("#placeholder_back_button", "afterEnd", ui = uiOutput("back_button", style = "height: fit-content !important;"))
+    values$radio_indicator <- "list"
     
-    output$back_button <- back_filter
+    output$back_button <- back_projects
     
     if(!is.null(values$school)){values$school_filter <- "yes"}
     if(is.null(values$school) & !is.null(values$theme_select)){
@@ -415,9 +432,8 @@ observeEvent(input$map_marker_click,{
     }
     
   }else{
-    removeUI("#back_button")
-    insertUI("#placeholder_back_button", "afterEnd", ui = uiOutput("back_button", style = "height: fit-content !important;"))
-    output$back_button <- back_all
+
+    output$back_button <- back_home
     
     values$school_filter <- "no"
     values$theme_filter <- "no"
@@ -457,12 +473,11 @@ observeEvent(input$map_click, {
   removeUI("#school_box")
   removeUI("#text_descriptive")
   removeUI("#table_df")
-  removeUI("#back_button")
   
+  output$back_button <- empty_button
   output$text <- text_home
   
   removeUI("#theme_box")
-  insertUI("#placeholder_theme_box","afterEnd",ui=uiOutput("theme_box", style = "height: fit-content !important;"))
   output$theme_box <- renderUI({
       selectizeInput(
         "theme_select_box",
@@ -473,16 +488,16 @@ observeEvent(input$map_click, {
         options = list(placeholder = "All Categories")
       )
     })
+  insertUI("#placeholder_theme_box","afterEnd",ui=uiOutput("theme_box", style = "height: fit-content !important;"))
   
   removeUI("#infotext")
-  insertUI("#placeholder_infotext","afterEnd",ui=uiOutput("infotext", style = "height: fit-content !important;"))
   output$infotext <- infotext
+  insertUI("#placeholder_infotext","afterEnd",ui=uiOutput("infotext", style = "height: fit-content !important;"))
   
   removeUI("#menu_box")
   insertUI("#placeholder_menu","afterEnd",ui=uiOutput("menu_box", style = "overflow-x: scroll !important; height: fit-content !important;"))
   
   removeUI("#submit_button")
-  insertUI("#placeholder_submit_button","afterEnd",ui=uiOutput("submit_button", style="width: 450px; margin-top:30px; margin-bottom:10px; height: fit-content !important;", align = "center"))
   output$submit_button <- renderUI({
     actionButton(
       "submit",
@@ -493,6 +508,7 @@ observeEvent(input$map_click, {
       
     )
   })
+  insertUI("#placeholder_submit_button","afterEnd",ui=uiOutput("submit_button", style="width: 450px; margin-top:30px; margin-bottom:10px; height: fit-content !important;", align = "center"))
   
   leafletProxy("map") %>%
     clearMarkerClusters() %>% 
@@ -523,6 +539,8 @@ observeEvent(input$map_click, {
 
 ```{r, context = "server"}
 observeEvent(input$table_rows_selected,{
+  
+  values$radio_indicator <- "list"
   
   removeUI("#school_box")
   removeUI("#theme_box")
@@ -580,7 +598,6 @@ observeEvent(input$table_rows_selected,{
   })
 
   removeUI("#text_descriptive")
-  insertUI("#placeholder_text_descriptive","afterEnd",ui = uiOutput("text_descriptive"))
   output$text_descriptive <- renderUI({
     
     HTML(paste(
@@ -604,12 +621,11 @@ observeEvent(input$table_rows_selected,{
     ))
     
   })
+  insertUI("#placeholder_text_descriptive","afterEnd",ui = uiOutput("text_descriptive"))
   
   if(!is.null(values$school) | !is.null(values$theme_select)){
     
-    removeUI("#back_button")
-    insertUI("#placeholder_back_button", "afterEnd", ui = uiOutput("back_button", style = "height:fit-content !important;"))
-    output$back_button <- back_filter
+    output$back_button <- back_projects
     
     if(!is.null(values$school)){values$school_filter <- "yes"}
     if(is.null(values$school) & !is.null(values$theme_select)){
@@ -623,9 +639,8 @@ observeEvent(input$table_rows_selected,{
     }
     
   }else{
-    removeUI("#back_button")
-    insertUI("#placeholder_back_button", "afterEnd", ui = uiOutput("back_button", style = "height:fit-content !important;"))
-    output$back_button <- back_all
+
+    output$back_button <- back_projects
     
     values$school_filter <- "no"
     values$theme_filter <- "no"
@@ -642,16 +657,15 @@ observeEvent(input$back,{
     removeUI("#school_box")
     removeUI("#text_descriptive")
     removeUI("#table_df")
-    removeUI("#back_button")
     
+    output$back_button <- empty_button
     output$text <- text_home
     
     removeUI("#info_text")
-    insertUI("#placeholder_infotext", "afterEnd", ui = uiOutput("infotext", style = "height:fit-content !important;"))
     output$infotext <- infotext
+    insertUI("#placeholder_infotext", "afterEnd", ui = uiOutput("infotext", style = "height:fit-content !important;"))
     
     removeUI("#theme_box")
-    insertUI("#placeholder_theme_box","afterEnd",ui=uiOutput("theme_box", style = "height:fit-content !important;"))
     output$theme_box <- renderUI({
       selectizeInput(
         "theme_select_box",
@@ -662,12 +676,11 @@ observeEvent(input$back,{
         options = list(placeholder = "All Categories")
       )
     })
+    insertUI("#placeholder_theme_box","afterEnd",ui=uiOutput("theme_box", style = "height:fit-content !important;"))
     
-    removeUI("#menu_box")
     insertUI("#placeholder_menu","afterEnd",ui=uiOutput("menu_box", style = "overflow-x:scroll !important; height: fit-content !important;"))
     
     removeUI("#submit_button")
-    insertUI("#placeholder_submit_button","afterEnd",ui=uiOutput("submit_button", style="width: 450px; margin-top:30px; margin-bottom:10px; height: fit-content !important;", align = "center"))
     output$submit_button <- renderUI({
       actionButton(
         "submit",
@@ -678,6 +691,7 @@ observeEvent(input$back,{
         
       )
     })
+    insertUI("#placeholder_submit_button","afterEnd",ui=uiOutput("submit_button", style="width: 450px; margin-top:30px; margin-bottom:10px; height: fit-content !important;", align = "center"))
     
     values$school <- NULL
     values$theme_select <- NULL
@@ -706,19 +720,20 @@ observeEvent(input$back,{
     
   } else if(values$radio_indicator == "list"){
     
+    values$radio_indicator <- "icon"
+    
     if(values$school_filter == "no"){values$school <- NULL}
     if(values$theme_filter == "no"){values$theme_select <- NULL}
     
+    output$back_button <- back_home
     output$text <- text_home
     
     removeUI("#infotext")
     removeUI("#text_descriptive")
-    removeUI("#back_button")
     removeUI("#menu_box")
     removeUI("#submit_button")
     
     removeUI("#theme_box")
-    insertUI("#placeholder_theme_box","afterEnd",ui=uiOutput("theme_box", style = "height:fit-content !important;"))
     output$theme_box <- renderUI({
       selectizeInput(
         "theme_select_box",
@@ -729,9 +744,9 @@ observeEvent(input$back,{
         options = list(placeholder = "All Categories")
       )
     })
+    insertUI("#placeholder_theme_box","afterEnd",ui=uiOutput("theme_box", style = "height:fit-content !important;"))
     
     removeUI("#school_box")
-    insertUI("#placeholder_school_box","afterEnd",ui=uiOutput("school_box", style = "height:fit-content !important;"))
     output$school_box <- renderUI({
       selectizeInput(
         "school_select_box",
@@ -742,6 +757,7 @@ observeEvent(input$back,{
         options = list(placeholder = "All Schools")
       )
     })
+    insertUI("#placeholder_school_box","afterEnd",ui=uiOutput("school_box", style = "height:fit-content !important;"))
     
     if(values$school_filter == "no" & values$theme_filter == "no"){
       
@@ -869,10 +885,10 @@ observeEvent(input$back,{
     }
     
     removeUI("#table_df")
-    insertUI("#placeholder_table_df","afterEnd",ui=uiOutput("table_df", style = "height:fit-content !important;"))
     output$table_df <- renderUI({
       dataTableOutput('table')
     })
+    insertUI("#placeholder_table_df","afterEnd",ui=uiOutput("table_df", style = "height:fit-content !important;"))
     
     output$table <- renderDataTable(
       display_data,
@@ -903,23 +919,24 @@ observeEvent(values$school, {
   removeUI("#menu_box")
   removeUI("#submit_button")
   
-  values$radio_indicator <- "list"
+  values$radio_indicator <- "icon"
   
-  removeUI("#theme_box")
-  insertUI("#placeholder_theme_box","afterEnd",ui=uiOutput("theme_box", style = "height:fit-content !important;"))
-  output$theme_box <- renderUI({
-    selectizeInput(
-      "theme_select_box",
-      label = "Filter by Impact Area: ",
-      choices = c(unique_themes),
-      selected = values$theme_select,
-      multiple = TRUE,
-      options = list(placeholder = "All Categories")
-    )
-  })
+  output$back_button <- back_home
   
-  removeUI("#school_box")
-  insertUI("#placeholder_school_box","afterEnd",ui=uiOutput("school_box", style = "height:fit-content !important;"))
+  # removeUI("#theme_box")
+  # output$theme_box <- renderUI({
+  #   selectizeInput(
+  #     "theme_select_box",
+  #     label = "Filter by Impact Area: ",
+  #     choices = c(unique_themes),
+  #     selected = values$theme_select,
+  #     multiple = TRUE,
+  #     options = list(placeholder = "All Categories")
+  #   )
+  # })
+  # insertUI("#placeholder_theme_box","afterEnd",ui=uiOutput("theme_box", style = "height:fit-content !important;"))
+  
+  # removeUI("#school_box")
   output$school_box <- renderUI({
     selectizeInput(
       "school_select_box",
@@ -930,6 +947,7 @@ observeEvent(values$school, {
       options = list(placeholder = "All Schools")
     )
   })
+  insertUI("#placeholder_school_box","afterEnd",ui=uiOutput("school_box", style = "height:fit-content !important;"))
   
   if(!is.null(values$school)){
     
@@ -947,11 +965,11 @@ observeEvent(values$school, {
       filter(!duplicated(`Campus Hubs`))
   }
   
-  removeUI("#table_df")
-  insertUI("#placeholder_table_df","afterEnd",ui=uiOutput("table_df", style = "height:fit-content !important;"))
+  # removeUI("#table_df")
   output$table_df <- renderUI({
       dataTableOutput('table')
     })
+  insertUI("#placeholder_table_df","afterEnd",ui=uiOutput("table_df", style = "height:fit-content !important;"))
     
   output$table <- renderDataTable(
     display_data,
@@ -1031,9 +1049,6 @@ observeEvent(input$button14, {
 observeEvent(input$theme_select_box, ignoreNULL = F,{
   
   values$theme_select <- input$theme_select_box
-  
-  print(values$theme_select)
-  print(values$school)
 
   if(!is.null(values$theme_select)){
     if(!is.null(values$school)){
@@ -1112,27 +1127,27 @@ observeEvent(input$theme_select_box, ignoreNULL = F,{
     
   }
   
-  if(values$radio_indicator == "list"){
-    display_data <- 
-      selectable_hubs %>% 
-      dplyr::select(`Campus Hubs`) %>% 
-      st_set_geometry(NULL)
-    
-    output$table <- renderDataTable(
-      display_data,
-      options = list(
-        pageLength = nrow(display_data),
-        lengthChange = FALSE,
-        bFilter=1,
-        bInfo=0,
-        bLengthChange=0,
-        searchHighlight = TRUE,
-        dom = 'ft'
-      ),
-      selection = 'single',
-      rownames = FALSE
-    )
-  }
+  # if(values$radio_indicator == "list"){
+  display_data <- 
+    selectable_hubs %>% 
+    dplyr::select(`Campus Hubs`) %>% 
+    st_set_geometry(NULL)
+  
+  output$table <- renderDataTable(
+    display_data,
+    options = list(
+      pageLength = nrow(display_data),
+      lengthChange = FALSE,
+      bFilter=1,
+      bInfo=0,
+      bLengthChange=0,
+      searchHighlight = TRUE,
+      dom = 'ft'
+    ),
+    selection = 'single',
+    rownames = FALSE
+  )
+  # }
   
 })
 ```
