@@ -145,7 +145,7 @@ button_style <- "display: inline-block;vertical-align:top; width: 144px;margin-l
 
 text_home <- renderUI({
   HTML(paste(
-    "<img src='https://raw.githubusercontent.com/citysystems/citysystems.github.io/master/images/oce.png' alt='Office of Community Engagement' style = 'width:70%; margin-left:-10px'>",
+    # "<img src='https://raw.githubusercontent.com/citysystems/citysystems.github.io/master/images/oce.png' alt='Office of Community Engagement' style = 'width:70%; margin-left:-10px'>",
     h1(strong("Community Engagement Hubs")),
     sep = "<br>"
   ))
@@ -158,11 +158,7 @@ infotext <- renderUI({
     "Managed by: <a href = https://community.stanford.edu/ target='_blank'>Stanford Office of Community Engagement</a>",
     "Contact us at: merryp@stanford.edu",
     "",
-    "",
-    "This interactive map represents Stanford’s engagement with the communities the university touches. It is intended to be a dynamic resource that illustrates Stanford’s many Community Engagement Hubs. OCE defines “Community Engagement Hubs” as the offices and units at Stanford that are able to:",
-    "<ul><li>Point to one or more sustained partnerships with actionable work</li><li>Dedicate resources to sustain the community partnership and engage faculty, staff, and students</li><li>Practice <a href = https://haas.stanford.edu/about/our-approach/principles-ethical-and-effective-service/ target='_blank'>ethical and effective service</a></li></ul>",
-    "How to Navigate: ",
-    "Click on the \"Impact Area\" dropdown menu to sort by engagement categories. Select the icons (in the icon view) or the school dropdown menu (in the list view) to sort based on Stanford schools and enter list view and enter list view. Click on the map markers or list items to display more information about a specific hub. To go back to the list view, click the \"Back to all\" button. To go back to the icon view, click anywhere on the map that's not a marker.",
+    "How to Navigate: Click on the Impact Area dropdown menu to sort by engagement categories. Select the icons or the Stanford Unit dropdown menu to sort based on Stanford schools and enter list view. Click on the map markers or list items to display more information about a specific hub. Navigate to a previous view using the back button at the top, or click anywhere on the map that's not a marker to return to the home page.",
     sep = "<br>"
   ))
 })
